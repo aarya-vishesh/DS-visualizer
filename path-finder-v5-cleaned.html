@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pathfinding Visualizer</title>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+      margin: 0;
+      background: #f4f4f9;
+      overflow: hidden; /* Removes scrollbars */
+      color: #333;
+      flex-direction: column;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      margin-bottom: 20px;
+      color: #333;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    #grid {
+      display: grid;
+      grid-template-columns: repeat(20, 1fr);
+      grid-template-rows: repeat(20, 1fr);
+      gap: 2px;
+      width: 80vw;
+      height: 60vh;
+      max-width: 1000px;
+      max-height: 800px;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+    }
+
+    .cell {
+      width: 100%;
+      height: 100%;
+      background-color: #fff;
+      border: 1px solid #ddd;
+      transition: background-color 0.3s ease;
+      cursor: pointer;
+      box-sizing: border-box;
+    }
+
+    .blocked {
+      background-color: #333;
+    }
+
+    .source {
+      background-color: #0d6efd;
+    }
+
+    .destination {
+      background-color: #dc3545;
+    }
+
+    .path {
+      background-color: #28a745; /* Green for the final path */
+    }
+
+    .visited {
+      background-color: #f0ad4e; /* Orange for visited cells */
+    }
+
+    button {
+      padding: 12px 20px;
+      margin: 15px 10px;
+      background-color: #0d6efd;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background-color 0.3s ease;
+    }
+
+    button:hover {
+      background-color: #0a58ca;
+    }
+
+    .controls {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin-top: 20px;
+      flex-wrap: wrap;
+    }
+
+    .controls button {
+      margin: 5px;
+    }
+
+  </style>
+</head>
+<body>
+
+  <h1>Pathfinding Visualizer (BFS & Dijkstra)</h1>
+
+  <div id="grid"></div>
+
+  <div class="controls">
+    <button onclick="visualizeBFS()">Visualize BFS</button>
+    <button onclick="visualizeDijkstra()">Visualize Dijkstra</button>
+    <button onclick="resetGrid()">Reset Grid</button>
+  </div>
+
+  <script>
+    const GRID_SIZE = 20; // 20x20 grid
+    let grid = [];
+    let source = null;
+    let destination = null;
+
+    // Create the grid
+    function createGrid() {
+      const gridContainer = document.getElementById("grid");
+      gridContainer.innerHTML = '';
+      grid = [];
+
+      for (let r = 0; r < GRID_SIZE; r++) {
+        const row = [];
+        for (let c = 0; c < GRID_SIZE; c++) {
+          const cell = document.createElement("div");
+          cell.classList.add("cell");
+          cell.dataset.row = r;
+          cell.dataset.col = c;
+          cell.addEventListener("click", () => onCellClick(r, c, cell));
+          gridContainer.appendChild(cell);
+          row.push(cell);
+        }
+        grid.push(row);
+      }
+    }
+
+    // Handle cell click (set source, destination, or block cells)
+    function onCellClick(row, col, cell) {
+      if (!source) {
+        source = { row, col };
+        cell.classList.add("source");
+      } else if (!destination) {
+        destination = { row, col };
+        cell.classList.add("destination");
+      } else {
+        if (!cell.classList.contains("source") && !cell.classList.contains("destination")) {
+          cell.classList.toggle("blocked");
+        }
+      }
+    }
+
+    // BFS Algorithm
+    async function visualizeBFS() {
+      if (!source || !destination) {
+        alert("Please select both source and destination points.");
+        return;
+      }
+
+      const queue = [source];
+      const visited = new Set();
+      const cameFrom = {}; // Store the path
+      const directions = [[0, 1], [1, 0], [0, -1], [-1, 0]];
+      const path = [];
+
+      const isValid = (row, col) => {
+        return (
+          row >= 0 && row < GRID_SIZE && col >= 0 && col < GRID_SIZE &&
+          !grid[row][col].classList.contains("blocked") &&
+          !visited.has(`${row},${col}`)
+        );
+      };
+
+      const reconstructPath = () => {
+        let current = destination;
+        while (current) {
+          path.push(current);
+          current = cameFrom[`${current.row},${current.col}`];
+        }
+        path.reverse();
+      };
+
+      while (queue.length > 0) {
+        const { row, col } = queue.shift();
+        if (visited.has(`${row},${col}`)) continue;
+
+        visited.add(`${row},${col}`);
+
+        if (row === destination.row && col === destination.col) {
+          reconstructPath();
+          highlightPath(path); // Highlight the final path in green
+          return;
+        }
+
+        for (const [dr, dc] of directions) {
+          const newRow = row + dr;
+          const newCol = col + dc;
+          if (isValid(newRow, newCol)) {
+            queue.push({ row: newRow, col: newCol });
+            cameFrom[`${newRow},${newCol}`] = { row, col };
+          }
+        }
+
+        // Highlight the visited cells step by step
+        highlightVisited(row, col);
+        await new Promise(resolve => setTimeout(resolve, 50)); // Slow down the visualization
+      }
+
+      alert("No path found!");
+    }
+
+    // Dijkstra Algorithm
+    async function visualizeDijkstra() {
+      if (!source || !destination) {
+        alert("Please select both source and destination points.");
+        return;
+      }
+
+      const pq = [{ row: source.row, col: source.col, dist: 0 }];
+      const distances = {};
+      const previous = {};
+      const visited = new Set();
+      const path = [];
+      const directions = [[0, 1], [1, 0], [0, -1], [-1, 0]];
+
+      // Initialize distances to infinity
+      for (let r = 0; r < GRID_SIZE; r++) {
+        for (let c = 0; c < GRID_SIZE; c++) {
+          distances[`${r},${c}`] = Infinity;
+        }
+      }
+      distances[`${source.row},${source.col}`] = 0;
+
+      const isValid = (row, col) => {
+        return (
+          row >= 0 && row < GRID_SIZE && col >= 0 && col < GRID_SIZE &&
+          !grid[row][col].classList.contains("blocked") &&
+          !visited.has(`${row},${col}`)
+        );
+      };
+
+      while (pq.length > 0) {
+        // Pop the node with the smallest distance
+        const { row, col } = pq.shift();
+
+        if (visited.has(`${row},${col}`)) continue;
+        visited.add(`${row},${col}`);
+
+        if (row === destination.row && col === destination.col) {
+          let current = destination;
+          while (current) {
+            path.push(current);
+            current = previous[`${current.row},${current.col}`];
+          }
+          path.reverse();
+          highlightPath(path);
+          return;
+        }
+
+        for (const [dr, dc] of directions) {
+          const newRow = row + dr;
+          const newCol = col + dc;
+          if (isValid(newRow, newCol)) {
+            const newDist = distances[`${row},${col}`] + 1;
+            if (newDist < distances[`${newRow},${newCol}`]) {
+              distances[`${newRow},${newCol}`] = newDist;
+              pq.push({ row: newRow, col: newCol, dist: newDist });
+              previous[`${newRow},${newCol}`] = { row, col };
+            }
+          }
+        }
+
+        // Highlight the visited cells step by step
+        highlightVisited(row, col);
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+
+      alert("No path found!");
+    }
+
+    // Highlight visited cells
+    function highlightVisited(row, col) {
+      const cell = grid[row][col];
+      if (!cell.classList.contains("source") && !cell.classList.contains("destination") && !cell.classList.contains("path")) {
+        cell.classList.add("visited");
+      }
+    }
+
+    // Highlight the optimal path in green
+    function highlightPath(path) {
+      path.forEach(({ row, col }) => {
+        const cell = grid[row][col];
+        cell.classList.remove("visited");
+        if (!cell.classList.contains("source") && !cell.classList.contains("destination")) {
+          cell.classList.add("path");
+        }
+      });
+    }
+
+    // Reset the grid
+    function resetGrid() {
+      source = null;
+      destination = null;
+      createGrid();
+    }
+
+    // Initialize the grid on page load
+    createGrid();
+  </script>
+
+</body>
+</html>
