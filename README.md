@@ -1,7 +1,5 @@
 # DS-visualizer
 
-e updated README without emojis:
-
 Pathfinding Visualizer (In Progress)
 This is a Pathfinding Visualizer project that showcases the inner workings of two popular pathfinding algorithms: Breadth-First Search (BFS) and Dijkstra's Algorithm. Inspired by a YouTuber’s work, I created a lighter version of the visualizer using JavaScript, HTML, and CSS.
 
